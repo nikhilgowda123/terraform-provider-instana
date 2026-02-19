@@ -1,4 +1,58 @@
 # Changelog
+
+## [v6.1.2](https://github.com/instana/terraform-provider-instana/tree/v6.1.2) (2026-02-19)
+
+[Full Changelog](https://github.com/instana/terraform-provider-instana/compare/v6.1.1...v6.1.2)
+
+**Implemented enhancements:**
+
+- Enable/Disable support for application and website alerts
+
+**Merged pull requests:**
+
+- Enable/Disable support for application and website alerts [\#74](https://github.com/instana/terraform-provider-instana/pull/74) ([georgekutty-1](https://github.com/georgekutty-1))
+
+## [v6.1.1](https://github.com/instana/terraform-provider-instana/tree/v6.1.1) (2026-02-05)
+
+[Full Changelog](https://github.com/instana/terraform-provider-instana/compare/v6.1.0...v6.1.1)
+
+**Fixed bugs:**
+
+- Fix state management issue in API token resource
+
+**Merged pull requests:**
+
+- api-token-resource fix [\#73](https://github.com/instana/terraform-provider-instana/pull/73) ([georgekutty-1](https://github.com/georgekutty-1))
+
+## [v6.1.0](https://github.com/instana/terraform-provider-instana/tree/v6.1.0) (2026-01-15)
+
+[Full Changelog](https://github.com/instana/terraform-provider-instana/compare/v6.0.4...v6.1.0)
+
+**Implemented enhancements:**
+
+- Added new instana_user data source that allows users to retrieve Instana user details by email address.
+
+**Merged pull requests:**
+
+- Datasource user [\#71](https://github.com/instana/terraform-provider-instana/pull/71) ([georgekutty-1](https://github.com/georgekutty-1))
+
+## [v6.0.4](https://github.com/instana/terraform-provider-instana/tree/v6.0.4) (2026-01-08)
+
+[Full Changelog](https://github.com/instana/terraform-provider-instana/compare/v6.0.3...v6.0.4)
+
+**Fixed bugs:**
+- Eliminate false positive changes from list ordering by converting to Sets
+
+**Implemented enhancements:**
+
+- Added support for creating and managing Infrastructure SLOs using the newly introduced Saturation blueprint
+
+**Merged pull requests:**
+
+- List ordering fix [\#70](https://github.com/instana/terraform-provider-instana/pull/70) ([georgekutty-1](https://github.com/georgekutty-1))
+- Add Saturation Blueprint support to SLO configs [\#69](https://github.com/instana/terraform-provider-instana/pull/69) ([nikhilgowda123](https://github.com/nikhilgowda123))
+
+
 ## [v6.0.3](https://github.com/instana/terraform-provider-instana/tree/v6.0.3) (2025-12-17)
 
 [Full Changelog](https://github.com/instana/terraform-provider-instana/compare/v6.0.2...v6.0.3)
