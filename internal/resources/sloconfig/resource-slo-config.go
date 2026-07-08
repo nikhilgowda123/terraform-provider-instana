@@ -147,6 +147,7 @@ func buildEntityAttribute() schema.SingleNestedAttribute {
 			SloConfigWebsiteEntity:        buildWebsiteEntityAttribute(),
 			SloConfigSyntheticEntity:      buildSyntheticEntityAttribute(),
 			SloConfigInfrastructureEntity: buildInfrastructureEntityAttribute(),
+			SloConfigMobileEntity:         buildMobileEntityAttribute(),
 		},
 	}
 }
@@ -255,6 +256,25 @@ func buildInfrastructureEntityAttribute() schema.SingleNestedAttribute {
 	}
 }
 
+// buildMobileEntityAttribute creates the mobile app entity nested attribute
+func buildMobileEntityAttribute() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: SloConfigDescMobileEntity,
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			SloConfigFieldMobileIDs: schema.SetAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+				Description: SloConfigDescMobileIDs,
+			},
+			SloConfigFieldFilterExpression: schema.StringAttribute{
+				Optional:    true,
+				Description: SloConfigDescEntityFilter,
+			},
+		},
+	}
+}
+
 // buildIndicatorAttribute creates the indicator nested attribute
 func buildIndicatorAttribute() schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
@@ -269,6 +289,77 @@ func buildIndicatorAttribute() schema.SingleNestedAttribute {
 			SchemaFieldCustom:                 buildCustomIndicatorAttribute(),
 			SchemaFieldTimeBasedSaturation:    buildTimeBasedSaturationIndicatorAttribute(),
 			SchemaFieldEventBasedSaturation:   buildEventBasedSaturationIndicatorAttribute(),
+			SchemaFieldAdvancedCustom:         buildAdvancedCustomIndicatorAttribute(),
+		},
+	}
+}
+
+// buildEntityMetricAttribute builds the nested metric attribute shared across threshold indicators
+func buildEntityMetricAttribute() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: SloConfigDescMetric,
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			"metric_name": schema.StringAttribute{
+				Optional:    true,
+				Description: SloConfigDescMetricMetricName,
+			},
+			SchemaFieldMetricScope: schema.SingleNestedAttribute{
+				Optional:    true,
+				Description: SloConfigDescMetricScope,
+				Attributes: map[string]schema.Attribute{
+					SchemaFieldMetricScopeType: schema.StringAttribute{
+						Optional:    true,
+						Description: SloConfigDescMetricScopeType,
+					},
+					SloConfigFieldFilterExpression: schema.StringAttribute{
+						Optional:    true,
+						Description: SloConfigDescEntityFilter,
+					},
+				},
+			},
+		},
+	}
+}
+
+// buildAdvancedFilterAttribute builds the nested good_events/bad_events attribute
+func buildAdvancedFilterAttribute() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: SloConfigDescAdvancedFilter,
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			SloConfigFieldAggregation: schema.StringAttribute{
+				Optional:    true,
+				Description: SloConfigDescAggregation,
+			},
+			SloConfigFieldThreshold: schema.Float64Attribute{
+				Optional:    true,
+				Description: SloConfigDescThreshold,
+			},
+			SchemaFieldOperator: schema.StringAttribute{
+				Optional:    true,
+				Description: SloConfigDescOperator,
+				Validators: []validator.String{
+					stringvalidator.OneOf(OperatorGreaterThan, OperatorGreaterThanOrEqual, OperatorLessThan, OperatorLessThanOrEqual),
+				},
+			},
+			SchemaFieldMetric: buildEntityMetricAttribute(),
+		},
+	}
+}
+
+// buildAdvancedCustomIndicatorAttribute creates the advanced-custom indicator attribute
+func buildAdvancedCustomIndicatorAttribute() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		Description: SloConfigDescAdvancedCustom,
+		Optional:    true,
+		Attributes: map[string]schema.Attribute{
+			SloConfigAPIFieldType: schema.StringAttribute{
+				Optional:    true,
+				Description: "Indicator type (eventBased)",
+			},
+			SchemaFieldGoodEvents: buildAdvancedFilterAttribute(),
+			SchemaFieldBadEvents:  buildAdvancedFilterAttribute(),
 		},
 	}
 }
@@ -289,6 +380,7 @@ func buildTimeBasedLatencyIndicatorAttribute() schema.SingleNestedAttribute {
 				Computed:    true,
 				Description: SloConfigDescAggregation,
 			},
+			SchemaFieldMetric: buildEntityMetricAttribute(),
 		},
 	}
 }
@@ -303,6 +395,7 @@ func buildEventBasedLatencyIndicatorAttribute() schema.SingleNestedAttribute {
 				Optional:    true,
 				Description: SloConfigDescThreshold,
 			},
+			SchemaFieldMetric: buildEntityMetricAttribute(),
 		},
 	}
 }
@@ -321,6 +414,7 @@ func buildTimeBasedAvailabilityIndicatorAttribute() schema.SingleNestedAttribute
 				Optional:    true,
 				Description: SloConfigDescAggregation,
 			},
+			SchemaFieldMetric: buildEntityMetricAttribute(),
 		},
 	}
 }
@@ -330,7 +424,17 @@ func buildEventBasedAvailabilityIndicatorAttribute() schema.SingleNestedAttribut
 	return schema.SingleNestedAttribute{
 		Description: SloConfigDescEventBasedAvailability,
 		Optional:    true,
-		Attributes:  map[string]schema.Attribute{},
+		Attributes: map[string]schema.Attribute{
+			SloConfigFieldThreshold: schema.Float64Attribute{
+				Optional:    true,
+				Description: SloConfigDescThreshold,
+			},
+			SloConfigFieldAggregation: schema.StringAttribute{
+				Optional:    true,
+				Description: SloConfigDescAggregation,
+			},
+			SchemaFieldMetric: buildEntityMetricAttribute(),
+		},
 	}
 }
 
@@ -350,14 +454,13 @@ func buildTrafficIndicatorAttribute() schema.SingleNestedAttribute {
 			},
 			SchemaFieldOperator: schema.StringAttribute{
 				Optional:    true,
+				Computed:    true,
 				Description: SloConfigDescOperator,
 				Validators: []validator.String{
 					stringvalidator.OneOf(OperatorGreaterThan, OperatorGreaterThanOrEqual, OperatorLessThan, OperatorLessThanOrEqual),
 				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
+			SchemaFieldMetric: buildEntityMetricAttribute(),
 		},
 	}
 }
@@ -414,6 +517,7 @@ func buildTimeBasedSaturationIndicatorAttribute() schema.SingleNestedAttribute {
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			SchemaFieldMetric: buildEntityMetricAttribute(),
 		},
 	}
 }
@@ -448,6 +552,7 @@ func buildEventBasedSaturationIndicatorAttribute() schema.SingleNestedAttribute 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			SchemaFieldMetric: buildEntityMetricAttribute(),
 		},
 	}
 }
@@ -537,7 +642,7 @@ func (r *sloConfigResource) MapStateToDataObject(ctx context.Context, plan *tfsd
 	if diags.HasError() {
 		return nil, diags
 	}
-	return &api.SloConfig{
+	sloConfig := &api.SloConfig{
 		ID:         id,
 		Name:       model.Name.ValueString(),
 		Target:     model.Target.ValueFloat64(),
@@ -546,7 +651,8 @@ func (r *sloConfigResource) MapStateToDataObject(ctx context.Context, plan *tfsd
 		TimeWindow: timeWindowData,
 		Tags:       r.mapTagsFromState(model.Tags),
 		RbacTags:   r.mapRbacTagsFromState(model.RbacTags),
-	}, diags
+	}
+	return sloConfig, diags
 }
 
 // extractModelFromPlanOrState retrieves the model from plan or state
@@ -617,6 +723,10 @@ func (r *sloConfigResource) mapEntityFromState(entityObj EntityModel) (api.SloEn
 
 	if entityObj.InfrastructureEntityModel != nil {
 		return r.validateAndMapInfrastructureEntity(entityObj.InfrastructureEntityModel)
+	}
+
+	if entityObj.MobileEntityModel != nil {
+		return r.validateAndMapMobileEntity(entityObj.MobileEntityModel)
 	}
 
 	var diags diag.Diagnostics
@@ -774,6 +884,32 @@ func (r *sloConfigResource) buildSyntheticEntity(model *SyntheticEntityModel) ap
 	return entity
 }
 
+// validateAndMapMobileEntity validates and maps mobile entity from state
+func (r *sloConfigResource) validateAndMapMobileEntity(model *MobileEntityModel) (api.SloEntity, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	mobileIDs := make([]string, 0)
+	if !model.MobileIDs.IsNull() && !model.MobileIDs.IsUnknown() {
+		for _, elem := range model.MobileIDs.Elements() {
+			if strVal, ok := elem.(types.String); ok && !strVal.IsNull() && !strVal.IsUnknown() {
+				mobileIDs = append(mobileIDs, strVal.ValueString())
+			}
+		}
+	}
+
+	filterExpr, filterDiags := r.mapFilterExpressionToEntity(model.FilterExpression)
+	diags.Append(filterDiags...)
+	if diags.HasError() {
+		return api.SloEntity{}, diags
+	}
+
+	return api.SloEntity{
+		Type:             SloConfigMobileEntity,
+		MobileIds:        mobileIDs,
+		FilterExpression: filterExpr,
+	}, diags
+}
+
 // validateAndMapInfrastructureEntity validates and maps infrastructure entity from state
 func (r *sloConfigResource) validateAndMapInfrastructureEntity(model *InfrastructureEntityModel) (api.SloEntity, diag.Diagnostics) {
 	var diags diag.Diagnostics
@@ -856,7 +992,7 @@ func (r *sloConfigResource) mapIndicatorFromState(indicatorModel IndicatorModel)
 	}
 
 	if indicatorModel.EventBasedAvailabilityIndicatorModel != nil {
-		return r.mapEventBasedAvailabilityIndicator()
+		return r.mapEventBasedAvailabilityIndicator(indicatorModel.EventBasedAvailabilityIndicatorModel)
 	}
 
 	if indicatorModel.TrafficIndicatorModel != nil {
@@ -873,6 +1009,10 @@ func (r *sloConfigResource) mapIndicatorFromState(indicatorModel IndicatorModel)
 
 	if indicatorModel.EventBasedSaturationIndicatorModel != nil {
 		return r.mapEventBasedSaturationIndicator(indicatorModel.EventBasedSaturationIndicatorModel)
+	}
+
+	if indicatorModel.AdvancedCustomIndicatorModel != nil {
+		return r.mapAdvancedCustomIndicator(indicatorModel.AdvancedCustomIndicatorModel)
 	}
 
 	var diags diag.Diagnostics
@@ -896,6 +1036,7 @@ func (r *sloConfigResource) mapTimeBasedLatencyIndicator(model *TimeBasedLatency
 		Type:        SloConfigAPIIndicatorMeasurementTypeTimeBased,
 		Threshold:   model.Threshold.ValueFloat64(),
 		Aggregation: &aggregation,
+		Metric:      r.mapEntityMetricFromModel(model.Metric),
 	}, diags
 }
 
@@ -914,6 +1055,7 @@ func (r *sloConfigResource) mapEventBasedLatencyIndicator(model *EventBasedLaten
 		Type:        SloConfigAPIIndicatorMeasurementTypeEventBased,
 		Threshold:   model.Threshold.ValueFloat64(),
 		Aggregation: defaultAgg,
+		Metric:      r.mapEntityMetricFromModel(model.Metric),
 	}, diags
 }
 
@@ -933,18 +1075,24 @@ func (r *sloConfigResource) mapTimeBasedAvailabilityIndicator(model *TimeBasedAv
 		Type:        SloConfigAPIIndicatorMeasurementTypeTimeBased,
 		Threshold:   model.Threshold.ValueFloat64(),
 		Aggregation: &aggregation,
+		Metric:      r.mapEntityMetricFromModel(model.Metric),
 	}, diags
 }
 
 // mapEventBasedAvailabilityIndicator maps event-based availability indicator from state
-func (r *sloConfigResource) mapEventBasedAvailabilityIndicator() (api.SloIndicator, diag.Diagnostics) {
+func (r *sloConfigResource) mapEventBasedAvailabilityIndicator(model *EventBasedAvailabilityIndicatorModel) (api.SloIndicator, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	defaultAgg := r.getDefaultAggregation()
 
+	aggregation := model.Aggregation.ValueString()
+	if aggregation == "" {
+		aggregation = DefaultAggregation
+	}
 	return api.SloIndicator{
 		Blueprint:   SloConfigAPIIndicatorBlueprintAvailability,
 		Type:        SloConfigAPIIndicatorMeasurementTypeEventBased,
-		Aggregation: defaultAgg,
+		Threshold:   model.Threshold.ValueFloat64(),
+		Aggregation: &aggregation,
+		Metric:      r.mapEntityMetricFromModel(model.Metric),
 	}, diags
 }
 
@@ -959,7 +1107,7 @@ func (r *sloConfigResource) mapTrafficIndicator(model *TrafficIndicatorModel) (a
 
 	trafficType := model.TrafficType.ValueString()
 	operator := model.Operator.ValueString()
-	defaultAgg := r.getDefaultAggregation()
+	trafficAgg := "SUM"
 
 	return api.SloIndicator{
 		Blueprint:   SloConfigAPIIndicatorBlueprintTraffic,
@@ -967,7 +1115,8 @@ func (r *sloConfigResource) mapTrafficIndicator(model *TrafficIndicatorModel) (a
 		TrafficType: &trafficType,
 		Threshold:   model.Threshold.ValueFloat64(),
 		Operator:    &operator,
-		Aggregation: defaultAgg,
+		Aggregation: &trafficAgg,
+		Metric:      r.mapEntityMetricFromModel(model.Metric),
 	}, diags
 }
 
@@ -1022,6 +1171,7 @@ func (r *sloConfigResource) mapTimeBasedSaturationIndicator(model *TimeBasedSatu
 		Aggregation: &aggregation,
 		Operator:    &operator,
 		MetricName:  &metricName,
+		Metric:      r.mapEntityMetricFromModel(model.Metric),
 	}, diags
 }
 
@@ -1045,8 +1195,110 @@ func (r *sloConfigResource) mapEventBasedSaturationIndicator(model *EventBasedSa
 		Aggregation: defaultAgg,
 		Operator:    &operator,
 		MetricName:  &metricName,
+		Metric:      r.mapEntityMetricFromModel(model.Metric),
 	}, diags
+}
 
+// mapAdvancedCustomIndicator maps advanced-custom indicator from state
+func (r *sloConfigResource) mapAdvancedCustomIndicator(model *AdvancedCustomIndicatorModel) (api.SloIndicator, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	if model.GoodEvents == nil || model.GoodEvents.Metric == nil {
+		diags.AddError(SloConfigErrAdvancedCustomRequired, SloConfigErrAdvancedCustomRequiredMsg)
+		return api.SloIndicator{}, diags
+	}
+
+	indicatorType := model.Type.ValueString()
+	if indicatorType == EmptyString {
+		indicatorType = SloConfigAPIIndicatorMeasurementTypeEventBased
+	}
+
+	goodEvents := r.mapAdvancedFilterFromModel(model.GoodEvents)
+	var badEvents *api.SloAdvancedFilter
+	if model.BadEvents != nil {
+		bf := r.mapAdvancedFilterFromModel(model.BadEvents)
+		badEvents = &bf
+	}
+
+	return api.SloIndicator{
+		Blueprint:  SloConfigAPIIndicatorBlueprintAdvancedCustom,
+		Type:       indicatorType,
+		GoodEvents: &goodEvents,
+		BadEvents:  badEvents,
+	}, diags
+}
+
+// mapAdvancedFilterFromModel converts an AdvancedFilterModel to an api.SloAdvancedFilter
+func (r *sloConfigResource) mapAdvancedFilterFromModel(model *AdvancedFilterModel) api.SloAdvancedFilter {
+	filter := api.SloAdvancedFilter{
+		Aggregation: model.Aggregation.ValueString(),
+		Threshold:   model.Threshold.ValueFloat64(),
+		Operator:    model.Operator.ValueString(),
+	}
+	if model.Metric != nil {
+		filter.Metric = r.mapEntityMetricFromModel(model.Metric)
+	}
+	return filter
+}
+
+// mapEntityMetricFromModel converts an EntityMetricModel to an api.SloEntityMetric (nil-safe)
+func (r *sloConfigResource) mapEntityMetricFromModel(model *EntityMetricModel) *api.SloEntityMetric {
+	if model == nil {
+		return nil
+	}
+	m := &api.SloEntityMetric{
+		Name: model.MetricName.ValueString(),
+	}
+	if model.Scope != nil {
+		scopeFilter := r.createDefaultTagFilter()
+		if !model.Scope.FilterExpression.IsNull() && !model.Scope.FilterExpression.IsUnknown() {
+			parser := tagfilter.NewParser()
+			expr, err := parser.Parse(model.Scope.FilterExpression.ValueString())
+			if err == nil {
+				mapper := tagfilter.NewMapper()
+				scopeFilter = mapper.ToAPIModel(expr)
+			}
+		}
+		m.Scope = &api.SloEntityMetricScope{
+			Type:             model.Scope.ScopeType.ValueString(),
+			FilterExpression: scopeFilter,
+		}
+	}
+	return m
+}
+
+// mapEntityMetricToModel converts an api.SloEntityMetric to an EntityMetricModel
+func (r *sloConfigResource) mapEntityMetricToModel(metric *api.SloEntityMetric) *EntityMetricModel {
+	if metric == nil {
+		return nil
+	}
+	m := &EntityMetricModel{
+		MetricName: types.StringValue(metric.Name),
+	}
+	if metric.Scope != nil {
+		scopeModel := &EntityMetricScopeModel{
+			ScopeType: types.StringValue(metric.Scope.Type),
+		}
+		if metric.Scope.FilterExpression != nil {
+			mapper := tagfilter.NewMapper()
+			expr, err := mapper.FromAPIModel(metric.Scope.FilterExpression)
+			if err == nil && expr != nil {
+				rendered := expr.Render()
+				// only store if it's a non-empty expression
+				if rendered != "" {
+					scopeModel.FilterExpression = types.StringValue(rendered)
+				} else {
+					scopeModel.FilterExpression = types.StringNull()
+				}
+			} else {
+				scopeModel.FilterExpression = types.StringNull()
+			}
+		} else {
+			scopeModel.FilterExpression = types.StringNull()
+		}
+		m.Scope = scopeModel
+	}
+	return m
 }
 
 // getDefaultAggregation returns the default aggregation value
@@ -1262,6 +1514,15 @@ func (r *sloConfigResource) mapEntityToState(apiObject *api.SloConfig, currentEn
 		if !diags.HasError() {
 			entityModel.InfrastructureEntityModel = &infraModel
 		}
+	case SloConfigMobileEntity:
+		mobileModel, mobileDiags := r.mapMobileEntityToState(apiObject.Entity)
+		if currentEntityModel != nil && currentEntityModel.MobileEntityModel != nil {
+			mobileModel.FilterExpression = currentEntityModel.MobileEntityModel.FilterExpression
+		}
+		diags.Append(mobileDiags...)
+		if !diags.HasError() {
+			entityModel.MobileEntityModel = &mobileModel
+		}
 	default:
 		diags.AddError(SloConfigErrMappingEntityToState, fmt.Sprintf(SloConfigErrUnsupportedEntityType, apiObject.Entity.Type))
 	}
@@ -1360,6 +1621,26 @@ func (r *sloConfigResource) mapInfrastructureEntityToState(entity api.SloEntity)
 	return model, diags
 }
 
+// mapMobileEntityToState converts mobile entity from API to state
+func (r *sloConfigResource) mapMobileEntityToState(entity api.SloEntity) (MobileEntityModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	mobileIDsSet, setDiags := types.SetValueFrom(context.Background(), types.StringType, entity.MobileIds)
+	diags.Append(setDiags...)
+
+	model := MobileEntityModel{
+		MobileIDs: mobileIDsSet,
+	}
+
+	filterExpr, filterDiags := r.mapFilterExpressionToState(entity.FilterExpression)
+	diags.Append(filterDiags...)
+	if !diags.HasError() {
+		model.FilterExpression = filterExpr
+	}
+
+	return model, diags
+}
+
 // mapFilterExpressionToState converts filter expression from API to state
 func (r *sloConfigResource) mapFilterExpressionToState(filterExpression *tag.TagFilter) (types.String, diag.Diagnostics) {
 	var diags diag.Diagnostics
@@ -1398,7 +1679,7 @@ func (r *sloConfigResource) mapIndicatorToState(apiObject *api.SloConfig, sloCon
 		indicatorModel.TimeBasedAvailabilityIndicatorModel = r.createTimeBasedAvailabilityModel(indicator)
 
 	case indicator.Type == SloConfigAPIIndicatorMeasurementTypeEventBased && indicator.Blueprint == SloConfigAPIIndicatorBlueprintAvailability:
-		indicatorModel.EventBasedAvailabilityIndicatorModel = r.createEventBasedAvailabilityModel()
+		indicatorModel.EventBasedAvailabilityIndicatorModel = r.createEventBasedAvailabilityModel(indicator)
 
 	case indicator.Blueprint == SloConfigAPIIndicatorBlueprintTraffic:
 		indicatorModel.TrafficIndicatorModel = r.createTrafficModel(indicator, existingVal)
@@ -1420,6 +1701,15 @@ func (r *sloConfigResource) mapIndicatorToState(apiObject *api.SloConfig, sloCon
 	case indicator.Type == SloConfigAPIIndicatorMeasurementTypeEventBased && indicator.Blueprint == SloConfigAPIIndicatorBlueprintSaturation:
 		indicatorModel.EventBasedSaturationIndicatorModel = r.createEventBasedSaturationModel(indicator)
 
+	case indicator.Blueprint == SloConfigAPIIndicatorBlueprintAdvancedCustom:
+		model := r.createAdvancedCustomModel(indicator)
+		// If bad_events was null in the plan, keep it null to avoid plan/apply inconsistency
+		if existingVal != nil && existingVal.AdvancedCustomIndicatorModel != nil &&
+			existingVal.AdvancedCustomIndicatorModel.BadEvents == nil {
+			model.BadEvents = nil
+		}
+		indicatorModel.AdvancedCustomIndicatorModel = model
+
 	default:
 		diags.AddError(SloConfigErrMappingIndicatorToState, fmt.Sprintf(SloConfigErrUnsupportedIndicatorType, indicator.Type, indicator.Blueprint))
 	}
@@ -1436,6 +1726,7 @@ func (r *sloConfigResource) createTimeBasedLatencyModel(indicator api.SloIndicat
 	return &TimeBasedLatencyIndicatorModel{
 		Threshold:   types.Float64Value(parsed),
 		Aggregation: util.SetStringPointerToState(indicator.Aggregation),
+		Metric:      r.mapEntityMetricToModel(indicator.Metric),
 	}
 }
 
@@ -1447,6 +1738,7 @@ func (r *sloConfigResource) createEventBasedLatencyModel(indicator api.SloIndica
 
 	return &EventBasedLatencyIndicatorModel{
 		Threshold: types.Float64Value(parsed),
+		Metric:    r.mapEntityMetricToModel(indicator.Metric),
 	}
 }
 
@@ -1459,12 +1751,19 @@ func (r *sloConfigResource) createTimeBasedAvailabilityModel(indicator api.SloIn
 	return &TimeBasedAvailabilityIndicatorModel{
 		Threshold:   types.Float64Value(parsed),
 		Aggregation: util.SetStringPointerToState(indicator.Aggregation),
+		Metric:      r.mapEntityMetricToModel(indicator.Metric),
 	}
 }
 
 // createEventBasedAvailabilityModel creates event-based availability indicator model
-func (r *sloConfigResource) createEventBasedAvailabilityModel() *EventBasedAvailabilityIndicatorModel {
-	return &EventBasedAvailabilityIndicatorModel{}
+func (r *sloConfigResource) createEventBasedAvailabilityModel(indicator api.SloIndicator) *EventBasedAvailabilityIndicatorModel {
+	formatted := strconv.FormatFloat(indicator.Threshold, 'f', 2, 64)
+	parsed, _ := strconv.ParseFloat(formatted, 64)
+	return &EventBasedAvailabilityIndicatorModel{
+		Threshold:   types.Float64Value(parsed),
+		Aggregation: util.SetStringPointerToState(indicator.Aggregation),
+		Metric:      r.mapEntityMetricToModel(indicator.Metric),
+	}
 }
 
 // createTrafficModel creates traffic indicator model
@@ -1476,9 +1775,13 @@ func (r *sloConfigResource) createTrafficModel(indicator api.SloIndicator, exist
 	trafficIndicatorModel := &TrafficIndicatorModel{
 		TrafficType: util.SetStringPointerToState(indicator.TrafficType),
 		Threshold:   types.Float64Value(parsed),
+		Metric:      r.mapEntityMetricToModel(indicator.Metric),
 	}
-	if existingVal == nil {
+	// Always prefer the API-returned operator; fall back to existing state value
+	if indicator.Operator != nil {
 		trafficIndicatorModel.Operator = util.SetStringPointerToState(indicator.Operator)
+	} else if existingVal != nil && existingVal.TrafficIndicatorModel != nil {
+		trafficIndicatorModel.Operator = existingVal.TrafficIndicatorModel.Operator
 	}
 	return trafficIndicatorModel
 }
@@ -1514,6 +1817,7 @@ func (r *sloConfigResource) createTimeBasedSaturationModel(indicator api.SloIndi
 		Threshold:   types.Float64Value(parsed),
 		Aggregation: util.SetStringPointerToState(indicator.Aggregation),
 		Operator:    util.SetStringPointerToState(indicator.Operator),
+		Metric:      r.mapEntityMetricToModel(indicator.Metric),
 	}
 }
 
@@ -1527,7 +1831,35 @@ func (r *sloConfigResource) createEventBasedSaturationModel(indicator api.SloInd
 		MetricName: util.SetStringPointerToState(indicator.MetricName),
 		Threshold:  types.Float64Value(parsed),
 		Operator:   util.SetStringPointerToState(indicator.Operator),
+		Metric:     r.mapEntityMetricToModel(indicator.Metric),
 	}
+}
+
+// createAdvancedCustomModel creates advanced-custom indicator model from API indicator
+func (r *sloConfigResource) createAdvancedCustomModel(indicator api.SloIndicator) *AdvancedCustomIndicatorModel {
+	model := &AdvancedCustomIndicatorModel{
+		Type: types.StringValue(indicator.Type),
+	}
+	if indicator.GoodEvents != nil {
+		gm := r.createAdvancedFilterModel(indicator.GoodEvents)
+		model.GoodEvents = &gm
+	}
+	if indicator.BadEvents != nil {
+		bm := r.createAdvancedFilterModel(indicator.BadEvents)
+		model.BadEvents = &bm
+	}
+	return model
+}
+
+// createAdvancedFilterModel creates an AdvancedFilterModel from an api.SloAdvancedFilter
+func (r *sloConfigResource) createAdvancedFilterModel(filter *api.SloAdvancedFilter) AdvancedFilterModel {
+	fm := AdvancedFilterModel{
+		Aggregation: types.StringValue(filter.Aggregation),
+		Threshold:   types.Float64Value(filter.Threshold),
+		Operator:    types.StringValue(filter.Operator),
+		Metric:      r.mapEntityMetricToModel(filter.Metric),
+	}
+	return fm
 }
 
 func (r *sloConfigResource) mapTimeWindowToState(apiObject *api.SloConfig) (TimeWindowModel, diag.Diagnostics) {
