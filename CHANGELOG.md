@@ -1,3 +1,21 @@
+## [v7.3.2](https://github.com/instana/terraform-provider-instana/tree/v7.3.2) (2026-07-09)
+
+[Full Changelog](https://github.com/instana/terraform-provider-instana/compare/v7.3.1...v7.3.2)
+
+**Implemented enhancements:**
+
+- Added `rbac_tags` support to `instana_alerting_channel`, `instana_custom_dashboard` and `instana_synthetic_test` resources
+
+**Fixed bugs:**
+
+- Provide default value (`Any`) for website alert rule `value` field when `operator = "NOT_EMPTY"` to prevent broken GUI configurations
+- Fixed `CustomPayloadFieldsToTerraform` returning `null` instead of empty list
+
+**Merged pull requests:**
+
+- Rbac tags addition and custom payload fix [\#99](https://github.com/instana/terraform-provider-instana/pull/99) ([georgekutty-1](https://github.com/georgekutty-1))
+- Provide default value for website alert message for Not Empty Operator [\#96](https://github.com/instana/terraform-provider-instana/pull/96) ([rmainwork](https://github.com/rmainwork))
+
 ## [v7.3.1](https://github.com/instana/terraform-provider-instana/tree/v7.3.1) (2026-07-01)
 
 [Full Changelog](https://github.com/instana/terraform-provider-instana/compare/v7.3.0...v7.3.1)
