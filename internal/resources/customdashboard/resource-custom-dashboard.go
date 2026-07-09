@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -81,6 +82,23 @@ func NewCustomDashboardResourceHandle() resourcehandle.ResourceHandle[*api.Custo
 							},
 						},
 					},
+					CustomDashboardFieldRbacTags: schema.ListNestedAttribute{
+						Description: CustomDashboardDescRbacTags,
+						Optional:    true,
+						Computed:    true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								CustomDashboardFieldRbacTagID: schema.StringAttribute{
+									Required:    true,
+									Description: CustomDashboardDescRbacTagID,
+								},
+								CustomDashboardFieldRbacTagDisplayName: schema.StringAttribute{
+									Required:    true,
+									Description: CustomDashboardDescRbacTagDisplayName,
+								},
+							},
+						},
+					},
 				},
 			},
 			SchemaVersion: 2,
@@ -127,11 +145,7 @@ func (r *customDashboardResource) UpdateState(ctx context.Context, state *tfsdk.
 	} else {
 		model = CustomDashboardModel{}
 	}
-	// Create a model and populate it with values from the dashboard
-	// model = CustomDashboardModel{
-	// 	ID:    types.StringValue(dashboard.ID),
-	// 	Title: types.StringValue(dashboard.Title),
-	// }
+
 	model.ID = types.StringValue(dashboard.ID)
 	model.Title = types.StringValue(dashboard.Title)
 
@@ -153,6 +167,8 @@ func (r *customDashboardResource) UpdateState(ctx context.Context, state *tfsdk.
 
 	// Map access rules
 	model.AccessRules = r.mapAccessRulesToState(dashboard.AccessRules)
+
+	model.RbacTags = r.mapRbacTagsToState(dashboard.RbacTags)
 
 	// Set the entire model to state
 	diags.Append(state.Set(ctx, model)...)
@@ -177,9 +193,37 @@ func (r *customDashboardResource) mapAccessRulesToState(accessRules []model.Acce
 	return models
 }
 
-// ============================================================================
-// State to API Mapping
-// ============================================================================
+// mapRbacTagsToState converts RBAC tags from API format to state List
+func (r *customDashboardResource) mapRbacTagsToState(rbacTags []api.RbacTag) types.List {
+	tagAttrTypes := map[string]attr.Type{
+		CustomDashboardFieldRbacTagID:          types.StringType,
+		CustomDashboardFieldRbacTagDisplayName: types.StringType,
+	}
+
+	// Always initialize with empty list, even if data is null or empty
+	if len(rbacTags) == 0 {
+		emptyList, _ := types.ListValue(
+			types.ObjectType{AttrTypes: tagAttrTypes},
+			[]attr.Value{},
+		)
+		return emptyList
+	}
+
+	tagValues := make([]attr.Value, len(rbacTags))
+	for i, tag := range rbacTags {
+		tagObj, _ := types.ObjectValue(
+			tagAttrTypes,
+			map[string]attr.Value{
+				CustomDashboardFieldRbacTagID:          types.StringValue(tag.ID),
+				CustomDashboardFieldRbacTagDisplayName: types.StringValue(tag.DisplayName),
+			},
+		)
+		tagValues[i] = tagObj
+	}
+
+	list, _ := types.ListValue(types.ObjectType{AttrTypes: tagAttrTypes}, tagValues)
+	return list
+}
 
 // MapStateToDataObject converts Terraform state to API data object
 func (r *customDashboardResource) MapStateToDataObject(ctx context.Context, plan *tfsdk.Plan, state *tfsdk.State) (*api.CustomDashboard, diag.Diagnostics) {
@@ -217,6 +261,7 @@ func (r *customDashboardResource) MapStateToDataObject(ctx context.Context, plan
 		ID:          id,
 		Title:       model.Title.ValueString(),
 		AccessRules: accessRules,
+		RbacTags:    r.mapRbacTagsFromState(model.RbacTags),
 		Widgets:     widgets,
 	}, diags
 }
@@ -248,6 +293,31 @@ func (r *customDashboardResource) mapAccessRulesFromState(accessRuleModels []Acc
 	}
 
 	return accessRules
+}
+
+// mapRbacTagsFromState converts RBAC tag models from state List to API format
+func (r *customDashboardResource) mapRbacTagsFromState(rbacTagsList types.List) []api.RbacTag {
+	// Always initialize with empty array, even if data is null or empty
+	if rbacTagsList.IsNull() || rbacTagsList.IsUnknown() {
+		return []api.RbacTag{}
+	}
+
+	var tagModels []RbacTagModel
+	rbacTagsList.ElementsAs(context.Background(), &tagModels, false)
+
+	if len(tagModels) == 0 {
+		return []api.RbacTag{}
+	}
+
+	rbacTags := make([]api.RbacTag, len(tagModels))
+	for i, tagModel := range tagModels {
+		rbacTags[i] = api.RbacTag{
+			DisplayName: tagModel.DisplayName.ValueString(),
+			ID:          tagModel.ID.ValueString(),
+		}
+	}
+
+	return rbacTags
 }
 
 // GetStateUpgraders returns the state upgraders for this resource

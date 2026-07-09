@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -40,6 +41,23 @@ func NewAlertingChannelResourceHandle() resourcehandle.ResourceHandle[*api.Alert
 					AlertingChannelFieldName: schema.StringAttribute{
 						Required:    true,
 						Description: AlertingChannelDescName,
+					},
+					AlertingChannelFieldRbacTags: schema.ListNestedAttribute{
+						Description: AlertingChannelDescRbacTags,
+						Optional:    true,
+						Computed:    true,
+						NestedObject: schema.NestedAttributeObject{
+							Attributes: map[string]schema.Attribute{
+								AlertingChannelFieldRbacTagID: schema.StringAttribute{
+									Required:    true,
+									Description: AlertingChannelDescRbacTagID,
+								},
+								AlertingChannelFieldRbacTagDisplayName: schema.StringAttribute{
+									Required:    true,
+									Description: AlertingChannelDescRbacTagDisplayName,
+								},
+							},
+						},
 					},
 					AlertingChannelFieldChannelEmail: schema.SingleNestedAttribute{
 						Optional:    true,
@@ -401,6 +419,19 @@ func (r *alertingChannelResource) UpdateState(ctx context.Context, state *tfsdk.
 	// Create base model with common fields
 	model := r.createBaseModel(alertingChannel)
 
+	// The Instana alerting channel API does not echo rbacTags back in its
+	// Create/Update response. On Create/Update (plan != nil) keep the value
+	// from the plan to avoid an "inconsistent result" error. On Read
+	// (plan == nil) populate from the API response.
+	// if plan != nil {
+	// 	var planModel AlertingChannelModel
+	// 	diags.Append(plan.Get(ctx, &planModel)...)
+	// 	if diags.HasError() {
+	// 		return diags
+	// 	}
+	// 	model.RbacTags = planModel.RbacTags
+	// }
+
 	// Map channel-specific data based on channel type
 	channelDiags := r.mapChannelTypeToModel(ctx, alertingChannel, &model)
 	if channelDiags.HasError() {
@@ -412,12 +443,69 @@ func (r *alertingChannelResource) UpdateState(ctx context.Context, state *tfsdk.
 	return diags
 }
 
-// createBaseModel creates the base model with common fields (ID and Name)
+// createBaseModel creates the base model with common fields (ID, Name and RbacTags)
 func (r *alertingChannelResource) createBaseModel(alertingChannel *api.AlertingChannel) AlertingChannelModel {
 	return AlertingChannelModel{
-		ID:   types.StringValue(alertingChannel.ID),
-		Name: types.StringValue(alertingChannel.Name),
+		ID:       types.StringValue(alertingChannel.ID),
+		Name:     types.StringValue(alertingChannel.Name),
+		RbacTags: r.mapRbacTagsToModel(alertingChannel.RbacTags),
 	}
+}
+
+// mapRbacTagsToModel converts RbacTags from the API to the model List
+func (r *alertingChannelResource) mapRbacTagsToModel(rbacTags []api.RbacTag) types.List {
+	tagAttrTypes := map[string]attr.Type{
+		AlertingChannelFieldRbacTagID:          types.StringType,
+		AlertingChannelFieldRbacTagDisplayName: types.StringType,
+	}
+
+	// Always initialize with empty list, even if data is null or empty
+	if len(rbacTags) == 0 {
+		emptyList, _ := types.ListValue(
+			types.ObjectType{AttrTypes: tagAttrTypes},
+			[]attr.Value{},
+		)
+		return emptyList
+	}
+
+	tagValues := make([]attr.Value, len(rbacTags))
+	for i, tag := range rbacTags {
+		tagObj, _ := types.ObjectValue(
+			tagAttrTypes,
+			map[string]attr.Value{
+				AlertingChannelFieldRbacTagID:          types.StringValue(tag.ID),
+				AlertingChannelFieldRbacTagDisplayName: types.StringValue(tag.DisplayName),
+			},
+		)
+		tagValues[i] = tagObj
+	}
+
+	list, _ := types.ListValue(types.ObjectType{AttrTypes: tagAttrTypes}, tagValues)
+	return list
+}
+
+// mapRbacTagsFromModel converts RbacTags from the model List to the API format
+func (r *alertingChannelResource) mapRbacTagsFromModel(rbacTagsList types.List) []api.RbacTag {
+	// Always initialize with empty array, even if data is null or empty
+	if rbacTagsList.IsNull() || rbacTagsList.IsUnknown() {
+		return []api.RbacTag{}
+	}
+
+	var tagModels []AlertingChannelRbacTagModel
+	rbacTagsList.ElementsAs(context.Background(), &tagModels, false)
+
+	if len(tagModels) == 0 {
+		return []api.RbacTag{}
+	}
+
+	tags := make([]api.RbacTag, len(tagModels))
+	for i, m := range tagModels {
+		tags[i] = api.RbacTag{
+			ID:          m.ID.ValueString(),
+			DisplayName: m.DisplayName.ValueString(),
+		}
+	}
+	return tags
 }
 
 // mapChannelTypeToModel maps the API channel data to the appropriate model field based on channel type
@@ -996,7 +1084,13 @@ func (r *alertingChannelResource) MapStateToDataObject(ctx context.Context, plan
 	id, name := r.extractCommonFields(model)
 
 	// Map the configured channel type to API object
-	return r.mapConfiguredChannelType(ctx, model, id, name)
+	channel, diags := r.mapConfiguredChannelType(ctx, model, id, name)
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	// Apply rbac_tags from the model
+	return r.applyRbacTags(channel, model), diags
 }
 
 // getModelFromPlanOrState retrieves the model from either plan or state
@@ -1023,7 +1117,8 @@ func (r *alertingChannelResource) extractCommonFields(model AlertingChannelModel
 	return id, name
 }
 
-// mapConfiguredChannelType determines which channel type is configured and maps it to API object
+// mapConfiguredChannelType determines which channel type is configured and maps it to API object.
+// It also sets RbacTags from the model on the returned object.
 func (r *alertingChannelResource) mapConfiguredChannelType(ctx context.Context, model AlertingChannelModel, id, name string) (*api.AlertingChannel, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
@@ -1083,6 +1178,12 @@ func (r *alertingChannelResource) mapConfiguredChannelType(ctx context.Context, 
 		AlertingChannelErrInvalidConfigMsg,
 	)
 	return nil, diags
+}
+
+// applyRbacTags sets RbacTags on the channel object and returns it
+func (r *alertingChannelResource) applyRbacTags(channel *api.AlertingChannel, model AlertingChannelModel) *api.AlertingChannel {
+	channel.RbacTags = r.mapRbacTagsFromModel(model.RbacTags)
+	return channel
 }
 
 // GetStateUpgraders returns the state upgraders for this resource

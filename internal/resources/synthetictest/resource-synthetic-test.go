@@ -590,6 +590,7 @@ func buildBaseSchema() map[string]schema.Attribute {
 		},
 		SyntheticTestFieldCustomProperties: schema.MapAttribute{
 			Optional:    true,
+			Computed:    true,
 			Description: SyntheticTestDescCustomProperties,
 			ElementType: types.StringType,
 		},
@@ -600,16 +601,17 @@ func buildBaseSchema() map[string]schema.Attribute {
 		},
 		SyntheticTestFieldRbacTags: schema.SetNestedAttribute{
 			Optional:    true,
+			Computed:    true,
 			Description: SyntheticTestDescRbacTags,
 			NestedObject: schema.NestedAttributeObject{
 				Attributes: map[string]schema.Attribute{
-					SyntheticTestFieldName: schema.StringAttribute{
+					SyntheticTestFieldRbacTagID: schema.StringAttribute{
 						Required:    true,
-						Description: SyntheticTestDescTagName,
+						Description: SyntheticTestDescRbacTagID,
 					},
-					SyntheticTestFieldValue: schema.StringAttribute{
+					SyntheticTestFieldRbacTagDisplayName: schema.StringAttribute{
 						Required:    true,
-						Description: SyntheticTestDescTagValue,
+						Description: SyntheticTestDescRbacTagDisplayName,
 					},
 				},
 			},
@@ -777,9 +779,13 @@ func (r *syntheticTestResource) mapWebsitesFromModel(ctx context.Context, model 
 func (r *syntheticTestResource) mapCustomPropertiesFromModel(ctx context.Context, model SyntheticTestModel) (map[string]string, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	customProperties := make(map[string]string)
+
+	// Always initialize with empty map, even if null or unknown
+	// This ensures empty object {} is treated as empty map and sent to API
 	if !model.CustomProperties.IsNull() && !model.CustomProperties.IsUnknown() {
 		diags.Append(model.CustomProperties.ElementsAs(ctx, &customProperties, false)...)
 	}
+
 	return customProperties, diags
 }
 
@@ -794,17 +800,18 @@ func (r *syntheticTestResource) mapLocationsFromModel(ctx context.Context, model
 }
 
 // mapRbacTagsFromModel maps RBAC tags from model
-func (r *syntheticTestResource) mapRbacTagsFromModel(ctx context.Context, model SyntheticTestModel) ([]api.ApiTag, diag.Diagnostics) {
+func (r *syntheticTestResource) mapRbacTagsFromModel(ctx context.Context, model SyntheticTestModel) ([]api.RbacTag, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	var rbacTags []api.ApiTag
+	// Always initialize with empty array, even if data is null or empty
+	rbacTags := []api.RbacTag{}
 	if !model.RbacTags.IsNull() && !model.RbacTags.IsUnknown() {
 		var rbacTagModels []RbacTagModel
 		diags.Append(model.RbacTags.ElementsAs(ctx, &rbacTagModels, false)...)
 		if !diags.HasError() {
 			for _, tagModel := range rbacTagModels {
-				rbacTags = append(rbacTags, api.ApiTag{
-					Name:  tagModel.Name.ValueString(),
-					Value: tagModel.Value.ValueString(),
+				rbacTags = append(rbacTags, api.RbacTag{
+					DisplayName: tagModel.DisplayName.ValueString(),
+					ID:          tagModel.ID.ValueString(),
 				})
 			}
 		}
@@ -1289,7 +1296,8 @@ func (r *syntheticTestResource) mapCustomPropertiesToModel(apiObject *api.Synthe
 		}
 		return types.MapValueMust(types.StringType, customPropertiesMap)
 	}
-	return types.MapNull(types.StringType)
+	// Return empty map (not null) to stay consistent with plan when custom_properties = {}
+	return types.MapValueMust(types.StringType, map[string]attr.Value{})
 }
 
 // mapLocationsToModel maps locations array to model
@@ -1306,33 +1314,35 @@ func (r *syntheticTestResource) mapLocationsToModel(apiObject *api.SyntheticTest
 
 // mapRbacTagsToModel maps RBAC tags to model
 func (r *syntheticTestResource) mapRbacTagsToModel(apiObject *api.SyntheticTest) types.Set {
-	if len(apiObject.RbacTags) > 0 {
-		rbacTagValues := make([]attr.Value, len(apiObject.RbacTags))
-		for i, tag := range apiObject.RbacTags {
-			tagObj, _ := types.ObjectValue(
-				map[string]attr.Type{
-					SyntheticTestFieldName:  types.StringType,
-					SyntheticTestFieldValue: types.StringType,
-				},
-				map[string]attr.Value{
-					SyntheticTestFieldName:  types.StringValue(tag.Name),
-					SyntheticTestFieldValue: types.StringValue(tag.Value),
-				},
-			)
-			rbacTagValues[i] = tagObj
-		}
-		return types.SetValueMust(
-			types.ObjectType{AttrTypes: map[string]attr.Type{
-				SyntheticTestFieldName:  types.StringType,
-				SyntheticTestFieldValue: types.StringType,
-			}},
-			rbacTagValues,
-		)
+	tagAttrTypes := map[string]attr.Type{
+		SyntheticTestFieldRbacTagDisplayName: types.StringType,
+		SyntheticTestFieldRbacTagID:          types.StringType,
 	}
-	return types.SetNull(types.ObjectType{AttrTypes: map[string]attr.Type{
-		SyntheticTestFieldName:  types.StringType,
-		SyntheticTestFieldValue: types.StringType,
-	}})
+
+	// Always initialize with empty set, even if data is null or empty
+	if len(apiObject.RbacTags) == 0 {
+		emptySet, _ := types.SetValue(
+			types.ObjectType{AttrTypes: tagAttrTypes},
+			[]attr.Value{},
+		)
+		return emptySet
+	}
+
+	rbacTagValues := make([]attr.Value, len(apiObject.RbacTags))
+	for i, tag := range apiObject.RbacTags {
+		tagObj, _ := types.ObjectValue(
+			tagAttrTypes,
+			map[string]attr.Value{
+				SyntheticTestFieldRbacTagDisplayName: types.StringValue(tag.DisplayName),
+				SyntheticTestFieldRbacTagID:          types.StringValue(tag.ID),
+			},
+		)
+		rbacTagValues[i] = tagObj
+	}
+	return types.SetValueMust(
+		types.ObjectType{AttrTypes: tagAttrTypes},
+		rbacTagValues,
+	)
 }
 
 // mapHttpActionConfigToModel maps HTTP Action configuration to model
